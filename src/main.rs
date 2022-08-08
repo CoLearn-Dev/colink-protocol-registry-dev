@@ -10,15 +10,56 @@ mod colink_remote_storage_proto {
     include!(concat!(env!("OUT_DIR"), "/colink_remote_storage.rs"));
 }
 
-struct SetRegistries;
+struct UpdateRegistries;
 #[colink_sdk::async_trait]
-impl ProtocolEntry for SetRegistries {
+impl ProtocolEntry for UpdateRegistries {
     async fn start(
         &self,
         cl: CoLink,
         param: Vec<u8>,
         _participants: Vec<Participant>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+        let _ = async {
+            let registries = cl.read_entry("_registry:registries").await?;
+            let registries: Registries = Message::decode(&*registries)?;
+            for registry in registries.registries {
+                let _ = async {
+                    let user_id = decode_jwt_without_validation(&registry.guest_jwt)?.user_id;
+                    if user_id == cl.get_user_id()? {
+                        cl.delete_entry(&format!(
+                            "_remote_storage:public:{}:_registry:user_record",
+                            user_id,
+                        ))
+                        .await?;
+                    } else {
+                        cl.import_guest_jwt(&registry.guest_jwt).await?;
+                        cl.import_core_addr(&user_id, &registry.address).await?;
+                        let participants = vec![
+                            Participant {
+                                user_id: cl.get_user_id()?,
+                                role: "requester".to_string(),
+                            },
+                            Participant {
+                                user_id,
+                                role: "provider".to_string(),
+                            },
+                        ];
+                        let params = DeleteParams {
+                            remote_key_name: "_registry:user_record".to_string(),
+                            is_public: true,
+                        };
+                        let mut payload = vec![];
+                        params.encode(&mut payload).unwrap();
+                        cl.run_task("remote_storage.delete", &payload, &participants, false)
+                            .await?;
+                    }
+                    Ok::<(), Box<dyn std::error::Error + Send + Sync + 'static>>(())
+                }
+                .await;
+            }
+            Ok::<(), Box<dyn std::error::Error + Send + Sync + 'static>>(())
+        }
+        .await;
         let registries: Registries = Message::decode(&*param)?;
         cl.update_entry("_registry:registries", &param).await?;
         let guest_jwt = cl
@@ -70,9 +111,9 @@ impl ProtocolEntry for SetRegistries {
     }
 }
 
-struct Query;
+struct QueryFromRegistries;
 #[colink_sdk::async_trait]
-impl ProtocolEntry for Query {
+impl ProtocolEntry for QueryFromRegistries {
     async fn start(
         &self,
         cl: CoLink,
@@ -133,6 +174,6 @@ impl ProtocolEntry for Query {
 }
 
 colink_sdk::protocol_start!(
-    ("registry:set_registries", SetRegistries),
-    ("registry:query", Query)
+    ("registry:update_registries", UpdateRegistries),
+    ("registry:query_from_registries", QueryFromRegistries)
 );
