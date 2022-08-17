@@ -1,13 +1,9 @@
 use colink_registry_proto::*;
-use colink_remote_storage_proto::*;
 use colink_sdk::{decode_jwt_without_validation, CoLink, Participant, ProtocolEntry};
 use prost::Message;
 
 mod colink_registry_proto {
     include!(concat!(env!("OUT_DIR"), "/colink_registry.rs"));
-}
-mod colink_remote_storage_proto {
-    include!(concat!(env!("OUT_DIR"), "/colink_remote_storage.rs"));
 }
 
 struct UpdateRegistries;
@@ -34,23 +30,7 @@ impl ProtocolEntry for UpdateRegistries {
                     } else {
                         cl.import_guest_jwt(&registry.guest_jwt).await?;
                         cl.import_core_addr(&user_id, &registry.address).await?;
-                        let participants = vec![
-                            Participant {
-                                user_id: cl.get_user_id()?,
-                                role: "requester".to_string(),
-                            },
-                            Participant {
-                                user_id,
-                                role: "provider".to_string(),
-                            },
-                        ];
-                        let params = DeleteParams {
-                            remote_key_name: "_registry:user_record".to_string(),
-                            is_public: true,
-                        };
-                        let mut payload = vec![];
-                        params.encode(&mut payload).unwrap();
-                        cl.run_task("remote_storage.delete", &payload, &participants, false)
+                        cl.remote_storage_delete(&[user_id], "_registry:user_record", true)
                             .await?;
                     }
                     Ok::<(), Box<dyn std::error::Error + Send + Sync + 'static>>(())
@@ -70,7 +50,7 @@ impl ProtocolEntry for UpdateRegistries {
             .await?;
         let user_record = UserRecord {
             user_id: cl.get_user_id()?,
-            core_addr: "http://127.0.0.1:8080".to_string(), // TODO cl.get_core_addr
+            core_addr: cl.get_core_addr()?,
             guest_jwt,
         };
         let mut payload = vec![];
@@ -86,24 +66,7 @@ impl ProtocolEntry for UpdateRegistries {
             } else {
                 cl.import_guest_jwt(&registry.guest_jwt).await?;
                 cl.import_core_addr(&user_id, &registry.address).await?;
-                let participants = vec![
-                    Participant {
-                        user_id: cl.get_user_id()?,
-                        role: "requester".to_string(),
-                    },
-                    Participant {
-                        user_id,
-                        role: "provider".to_string(),
-                    },
-                ];
-                let params = UpdateParams {
-                    remote_key_name: "_registry:user_record".to_string(),
-                    payload: payload.clone(),
-                    is_public: true,
-                };
-                let mut payload = vec![];
-                params.encode(&mut payload).unwrap();
-                cl.run_task("remote_storage.update", &payload, &participants, false)
+                cl.remote_storage_update(&[user_id], "_registry:user_record", &payload, true)
                     .await?;
             }
         }
@@ -123,7 +86,6 @@ impl ProtocolEntry for QueryFromRegistries {
         let user_record: UserRecord = Message::decode(&*param)?;
         let registries = cl.read_entry("_registry:registries").await?;
         let registries: Registries = Message::decode(&*registries)?;
-        #[allow(clippy::never_loop)]
         for registry in registries.registries {
             let user_id = decode_jwt_without_validation(&registry.guest_jwt)?.user_id;
             if user_id == cl.get_user_id()? {
@@ -132,36 +94,21 @@ impl ProtocolEntry for QueryFromRegistries {
                         "_remote_storage:public:{}:_registry:user_record",
                         user_record.user_id
                     ))
-                    .await?; // TODO error?
+                    .await?;
                 let user_record: UserRecord = Message::decode(&*data)?;
                 cl.import_guest_jwt(&user_record.guest_jwt).await?;
                 cl.import_core_addr(&user_record.user_id, &user_record.core_addr)
                     .await?;
                 return Ok(());
-            } else {
-                let participants = vec![
-                    Participant {
-                        user_id: cl.get_user_id()?,
-                        role: "requester".to_string(),
-                    },
-                    Participant {
-                        user_id,
-                        role: "provider".to_string(),
-                    },
-                ];
-                let params = ReadParams {
-                    remote_key_name: "_registry:user_record".to_string(),
-                    holder_id: user_record.user_id.clone(),
-                    is_public: true,
-                };
-                let mut payload = vec![];
-                params.encode(&mut payload).unwrap();
-                let task_id = cl
-                    .run_task("remote_storage.read", &payload, &participants, false)
-                    .await?;
-                let data = cl
-                    .read_or_wait(&format!("tasks:{}:output", task_id))
-                    .await?; // TODO timeout?
+            } else if let Ok(data) = cl
+                .remote_storage_read(
+                    &user_id,
+                    "_registry:user_record",
+                    true,
+                    &user_record.user_id,
+                )
+                .await
+            {
                 let user_record: UserRecord = Message::decode(&*data)?;
                 cl.import_guest_jwt(&user_record.guest_jwt).await?;
                 cl.import_core_addr(&user_record.user_id, &user_record.core_addr)

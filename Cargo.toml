@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4"
-colink-sdk = { tag = "v0.1.11", git = "ssh://git@github.com/CoLearn-Dev/colink-sdk-rust-dev.git" }
+colink-sdk = { tag = "v0.1.12", git = "ssh://git@github.com/CoLearn-Dev/colink-sdk-rust-dev.git" }
 prost = "0.10"
 tokio = "1.18"
 tracing = "0.1"

@@ -423,8 +423,8 @@ dependencies = [
 
 [[package]]
 name = "colink-sdk"
-version = "0.1.11"
-source = "git+ssh://git@github.com/CoLearn-Dev/colink-sdk-rust-dev.git?tag=v0.1.11#284fa0809cffd7c4e2a148b0a29777ec7f952996"
+version = "0.1.12"
+source = "git+ssh://git@github.com/CoLearn-Dev/colink-sdk-rust-dev.git?tag=v0.1.12#e55b5fff630b894f6a16c53e955c9a0563651f69"
 dependencies = [
  "async-trait",
  "base64",
