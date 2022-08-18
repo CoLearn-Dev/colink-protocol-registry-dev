@@ -9,8 +9,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     let registry_jwt = &args[2];
 
     let registry = Registry {
-        address: addr.clone(),
-        guest_jwt: registry_jwt,
+        address: addr.to_string(),
+        guest_jwt: registry_jwt.to_string(),
     };
     let registries = Registries {
         registries: vec![registry],
