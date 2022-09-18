@@ -1,5 +1,5 @@
+use colink::{decode_jwt_without_validation, CoLink, Participant, ProtocolEntry};
 use colink_registry_proto::*;
-use colink_sdk::{decode_jwt_without_validation, CoLink, Participant, ProtocolEntry};
 use prost::Message;
 
 mod colink_registry_proto {
@@ -7,7 +7,7 @@ mod colink_registry_proto {
 }
 
 struct UpdateRegistries;
-#[colink_sdk::async_trait]
+#[colink::async_trait]
 impl ProtocolEntry for UpdateRegistries {
     async fn start(
         &self,
@@ -75,7 +75,7 @@ impl ProtocolEntry for UpdateRegistries {
 }
 
 struct QueryFromRegistries;
-#[colink_sdk::async_trait]
+#[colink::async_trait]
 impl ProtocolEntry for QueryFromRegistries {
     async fn start(
         &self,
@@ -120,7 +120,7 @@ impl ProtocolEntry for QueryFromRegistries {
     }
 }
 
-colink_sdk::protocol_start!(
+colink::protocol_start!(
     ("registry:update_registries", UpdateRegistries),
     ("registry:query_from_registries", QueryFromRegistries)
 );
