@@ -1,0 +1,9 @@
+[package]
+name = "registry"
+keywords = ["registry"]
+description = "registry"
+entrypoint = "cargo run"
+
+[registry]
+name = "registry"
+description = "registry"

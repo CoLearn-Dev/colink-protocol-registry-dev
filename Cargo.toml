@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4"
-colink = "0.1.14"
+colink = "0.1.15"
 prost = "0.10"
 tokio = "1.18"
 tracing = "0.1"
