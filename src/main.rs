@@ -6,6 +6,33 @@ mod colink_registry_proto {
     include!(concat!(env!("OUT_DIR"), "/colink_registry.rs"));
 }
 
+pub struct Init;
+#[colink::async_trait]
+impl ProtocolEntry for Init {
+    async fn start(
+        &self,
+        cl: CoLink,
+        _param: Vec<u8>,
+        _participants: Vec<Participant>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+        let registry_addr =
+            String::from_utf8_lossy(&cl.read_entry("_registry:init:registry_addr").await?)
+                .to_string();
+        let registry_jwt =
+            String::from_utf8_lossy(&cl.read_entry("_registry:init:registry_jwt").await?)
+                .to_string();
+        let registry = colink::Registry {
+            address: registry_addr,
+            guest_jwt: registry_jwt,
+        };
+        let registries = colink::Registries {
+            registries: vec![registry],
+        };
+        cl.update_registries(&registries).await?;
+        Ok(())
+    }
+}
+
 struct UpdateRegistries;
 #[colink::async_trait]
 impl ProtocolEntry for UpdateRegistries {
@@ -121,6 +148,7 @@ impl ProtocolEntry for QueryFromRegistries {
 }
 
 colink::protocol_start!(
+    ("registry:@init", Init),
     ("registry:update_registries", UpdateRegistries),
     ("registry:query_from_registries", QueryFromRegistries)
 );
