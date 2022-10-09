@@ -1,5 +1,6 @@
 [package]
 name = "registry"
+version = "0.1.1"
 keywords = ["registry"]
 description = "registry"
 entrypoint = "cargo run"
