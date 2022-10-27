@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         "e83b334f83311761e63ca8bee06a45f8b580cc270fef353577882b0140d3e30f",
     )?)?;
     let pk = secp256k1::PublicKey::from_secret_key(&secp256k1::Secp256k1::new(), &sk);
-    let (_, core_pub_key) = cl.request_core_info().await?;
+    let (_, core_pub_key, _) = cl.request_info().await?;
     let (signature_timestamp, sig) =
         prepare_import_user_signature(&pk, &sk, &core_pub_key, expiration_timestamp);
     let user_jwt = cl

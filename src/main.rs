@@ -1,3 +1,4 @@
+#![allow(clippy::derive_partial_eq_without_eq)]
 use colink::{decode_jwt_without_validation, CoLink, Participant, ProtocolEntry};
 use colink_registry_proto::*;
 use prost::Message;
@@ -21,11 +22,11 @@ impl ProtocolEntry for Init {
         let registry_jwt =
             String::from_utf8_lossy(&cl.read_entry("_registry:init:registry_jwt").await?)
                 .to_string();
-        let registry = colink::Registry {
+        let registry = colink::extensions::registry::Registry {
             address: registry_addr,
             guest_jwt: registry_jwt,
         };
-        let registries = colink::Registries {
+        let registries = colink::extensions::registry::Registries {
             registries: vec![registry],
         };
         cl.update_registries(&registries).await?;

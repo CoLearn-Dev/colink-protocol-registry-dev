@@ -411,9 +411,9 @@ dependencies = [
 
 [[package]]
 name = "colink"
-version = "0.1.18"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79a6c77ef9cde8b11668e49926ee1e4718fc4f652e478a65be12f79d70be19d1"
+checksum = "58cbf2f89c3f67549da501669b6dff0c471cdb8f83b37ca0e48fddf3fa1ae058"
 dependencies = [
  "async-trait",
  "base64",
@@ -434,11 +434,12 @@ dependencies = [
  "tonic-build",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
 name = "colink-protocol-registry"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "colink",
@@ -2180,6 +2181,15 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+]
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom",
 ]
 
 [[package]]

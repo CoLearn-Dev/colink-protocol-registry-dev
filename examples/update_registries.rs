@@ -1,4 +1,4 @@
-use colink::*;
+use colink::{extensions::registry::*, *};
 use std::env;
 
 #[tokio::main]
