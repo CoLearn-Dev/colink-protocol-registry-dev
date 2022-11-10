@@ -25,7 +25,7 @@ impl ProtocolEntry for Init {
         _participants: Vec<Participant>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
         let colink_home = get_colink_home()?;
-        let registry_file = Path::new(&colink_home).join("registry.conf");
+        let registry_file = Path::new(&colink_home).join("reg_config");
         let registry_addr;
         let registry_jwt;
         if let Ok(mut file) = File::options().read(true).write(true).open(&registry_file) {
@@ -33,7 +33,7 @@ impl ProtocolEntry for Init {
             let mut buf = String::new();
             file.read_to_string(&mut buf)?;
             let lines: Vec<&str> = buf.lines().collect();
-            if !lines.is_empty() && lines[0] == "new_registry" {
+            if lines.is_empty() || lines[0].is_empty() {
                 registry_addr = cl.get_core_addr()?;
                 registry_jwt = cl.generate_token("guest").await?;
                 file.seek(SeekFrom::Start(0))?;
@@ -54,47 +54,51 @@ impl ProtocolEntry for Init {
             )
             .to_string();
         }
-        let registry = colink::extensions::registry::Registry {
+        let registry = Registry {
             address: registry_addr,
             guest_jwt: registry_jwt,
         };
-        let registries = colink::extensions::registry::Registries {
+        let registries = Registries {
             registries: vec![registry],
         };
-
-        let mut payload = vec![];
-        registries.encode(&mut payload).unwrap();
-        cl.update_entry("_registry:registries", &payload).await?;
-        let guest_jwt = cl
-            .generate_token_with_expiration_time(
-                chrono::Utc::now().timestamp() + 86400 * 31,
-                "guest",
-            )
-            .await?;
-        let user_record = UserRecord {
-            user_id: cl.get_user_id()?,
-            core_addr: cl.get_core_addr()?,
-            guest_jwt,
-        };
-        let mut payload = vec![];
-        user_record.encode(&mut payload).unwrap();
-        for registry in registries.registries {
-            let user_id = decode_jwt_without_validation(&registry.guest_jwt)?.user_id;
-            if user_id == cl.get_user_id()? {
-                cl.update_entry(
-                    &format!("_remote_storage:public:{}:_registry:user_record", user_id,),
-                    &payload,
-                )
-                .await?;
-            } else {
-                cl.import_guest_jwt(&registry.guest_jwt).await?;
-                cl.import_core_addr(&user_id, &registry.address).await?;
-                cl.remote_storage_update(&[user_id], "_registry:user_record", &payload, true)
-                    .await?;
-            }
-        }
+        update_registries(&cl, &registries).await?;
         Ok(())
     }
+}
+
+async fn update_registries(
+    cl: &CoLink,
+    registries: &Registries,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    let mut payload = vec![];
+    registries.encode(&mut payload).unwrap();
+    cl.update_entry("_registry:registries", &payload).await?;
+    let guest_jwt = cl
+        .generate_token_with_expiration_time(chrono::Utc::now().timestamp() + 86400 * 31, "guest")
+        .await?;
+    let user_record = UserRecord {
+        user_id: cl.get_user_id()?,
+        core_addr: cl.get_core_addr()?,
+        guest_jwt,
+    };
+    let mut payload = vec![];
+    user_record.encode(&mut payload).unwrap();
+    for registry in &registries.registries {
+        let user_id = decode_jwt_without_validation(&registry.guest_jwt)?.user_id;
+        if user_id == cl.get_user_id()? {
+            cl.update_entry(
+                &format!("_remote_storage:public:{}:_registry:user_record", user_id,),
+                &payload,
+            )
+            .await?;
+        } else {
+            cl.import_guest_jwt(&registry.guest_jwt).await?;
+            cl.import_core_addr(&user_id, &registry.address).await?;
+            cl.remote_storage_update(&[user_id], "_registry:user_record", &payload, true)
+                .await?;
+        }
+    }
+    Ok(())
 }
 
 struct UpdateRegistries;
@@ -132,35 +136,7 @@ impl ProtocolEntry for UpdateRegistries {
         }
         .await;
         let registries: Registries = Message::decode(&*param)?;
-        cl.update_entry("_registry:registries", &param).await?;
-        let guest_jwt = cl
-            .generate_token_with_expiration_time(
-                chrono::Utc::now().timestamp() + 86400 * 31,
-                "guest",
-            )
-            .await?;
-        let user_record = UserRecord {
-            user_id: cl.get_user_id()?,
-            core_addr: cl.get_core_addr()?,
-            guest_jwt,
-        };
-        let mut payload = vec![];
-        user_record.encode(&mut payload).unwrap();
-        for registry in registries.registries {
-            let user_id = decode_jwt_without_validation(&registry.guest_jwt)?.user_id;
-            if user_id == cl.get_user_id()? {
-                cl.update_entry(
-                    &format!("_remote_storage:public:{}:_registry:user_record", user_id,),
-                    &payload,
-                )
-                .await?;
-            } else {
-                cl.import_guest_jwt(&registry.guest_jwt).await?;
-                cl.import_core_addr(&user_id, &registry.address).await?;
-                cl.remote_storage_update(&[user_id], "_registry:user_record", &payload, true)
-                    .await?;
-            }
-        }
+        update_registries(&cl, &registries).await?;
         Ok(())
     }
 }
@@ -177,35 +153,33 @@ impl ProtocolEntry for QueryFromRegistries {
         let user_record: UserRecord = Message::decode(&*param)?;
         let registries = cl.read_entry("_registry:registries").await?;
         let registries: Registries = Message::decode(&*registries)?;
-        for registry in registries.registries {
-            let user_id = decode_jwt_without_validation(&registry.guest_jwt)?.user_id;
-            if user_id == cl.get_user_id()? {
-                let data = cl
-                    .read_entry(&format!(
+        for _ in 0..3 {
+            for registry in &registries.registries {
+                let user_id = decode_jwt_without_validation(&registry.guest_jwt)?.user_id;
+                let data = if user_id == cl.get_user_id()? {
+                    cl.read_entry(&format!(
                         "_remote_storage:public:{}:_registry:user_record",
                         user_record.user_id
                     ))
-                    .await?;
-                let user_record: UserRecord = Message::decode(&*data)?;
-                cl.import_guest_jwt(&user_record.guest_jwt).await?;
-                cl.import_core_addr(&user_record.user_id, &user_record.core_addr)
-                    .await?;
-                return Ok(());
-            } else if let Ok(data) = cl
-                .remote_storage_read(
-                    &user_id,
-                    "_registry:user_record",
-                    true,
-                    &user_record.user_id,
-                )
-                .await
-            {
-                let user_record: UserRecord = Message::decode(&*data)?;
-                cl.import_guest_jwt(&user_record.guest_jwt).await?;
-                cl.import_core_addr(&user_record.user_id, &user_record.core_addr)
-                    .await?;
-                return Ok(());
+                    .await
+                } else {
+                    cl.remote_storage_read(
+                        &user_id,
+                        "_registry:user_record",
+                        true,
+                        &user_record.user_id,
+                    )
+                    .await
+                };
+                if data.is_ok() {
+                    let user_record: UserRecord = Message::decode(&*data.unwrap())?;
+                    cl.import_guest_jwt(&user_record.guest_jwt).await?;
+                    cl.import_core_addr(&user_record.user_id, &user_record.core_addr)
+                        .await?;
+                    return Ok(());
+                }
             }
+            tokio::time::sleep(core::time::Duration::from_secs(1)).await;
         }
         Ok(())
     }
