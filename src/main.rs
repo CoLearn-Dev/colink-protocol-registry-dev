@@ -1,7 +1,15 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
-use colink::{decode_jwt_without_validation, CoLink, Participant, ProtocolEntry};
+use colink::{
+    decode_jwt_without_validation, utils::get_colink_home, CoLink, Participant, ProtocolEntry,
+};
 use colink_registry_proto::*;
+use fs4::FileExt;
 use prost::Message;
+use std::{
+    fs::File,
+    io::{Read, Seek, SeekFrom, Write},
+    path::Path,
+};
 
 mod colink_registry_proto {
     include!(concat!(env!("OUT_DIR"), "/colink_registry.rs"));
@@ -16,12 +24,36 @@ impl ProtocolEntry for Init {
         _param: Vec<u8>,
         _participants: Vec<Participant>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let registry_addr =
-            String::from_utf8_lossy(&cl.read_entry("_registry:init:registry_addr").await?)
-                .to_string();
-        let registry_jwt =
-            String::from_utf8_lossy(&cl.read_entry("_registry:init:registry_jwt").await?)
-                .to_string();
+        let colink_home = get_colink_home()?;
+        let registry_file = Path::new(&colink_home).join("registry.conf");
+        let registry_addr;
+        let registry_jwt;
+        if let Ok(mut file) = File::options().read(true).write(true).open(&registry_file) {
+            file.lock_exclusive()?;
+            let mut buf = String::new();
+            file.read_to_string(&mut buf)?;
+            let lines: Vec<&str> = buf.lines().collect();
+            if !lines.is_empty() && lines[0] == "new_registry" {
+                registry_addr = cl.get_core_addr()?;
+                registry_jwt = cl.generate_token("guest").await?;
+                file.seek(SeekFrom::Start(0))?;
+                file.write_all(format!("{}\n{}\n", registry_addr, registry_jwt).as_bytes())?;
+            } else {
+                registry_addr = lines[0].to_string();
+                registry_jwt = lines[1].to_string();
+            }
+            file.unlock()?;
+        } else {
+            registry_addr = String::from_utf8_lossy(
+                &cl.read_entry("_registry:init:default_registry_addr")
+                    .await?,
+            )
+            .to_string();
+            registry_jwt = String::from_utf8_lossy(
+                &cl.read_entry("_registry:init:default_registry_jwt").await?,
+            )
+            .to_string();
+        }
         let registry = colink::extensions::registry::Registry {
             address: registry_addr,
             guest_jwt: registry_jwt,
