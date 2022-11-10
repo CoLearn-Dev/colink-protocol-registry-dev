@@ -61,7 +61,38 @@ impl ProtocolEntry for Init {
         let registries = colink::extensions::registry::Registries {
             registries: vec![registry],
         };
-        cl.update_registries(&registries).await?;
+
+        let mut payload = vec![];
+        registries.encode(&mut payload).unwrap();
+        cl.update_entry("_registry:registries", &payload).await?;
+        let guest_jwt = cl
+            .generate_token_with_expiration_time(
+                chrono::Utc::now().timestamp() + 86400 * 31,
+                "guest",
+            )
+            .await?;
+        let user_record = UserRecord {
+            user_id: cl.get_user_id()?,
+            core_addr: cl.get_core_addr()?,
+            guest_jwt,
+        };
+        let mut payload = vec![];
+        user_record.encode(&mut payload).unwrap();
+        for registry in registries.registries {
+            let user_id = decode_jwt_without_validation(&registry.guest_jwt)?.user_id;
+            if user_id == cl.get_user_id()? {
+                cl.update_entry(
+                    &format!("_remote_storage:public:{}:_registry:user_record", user_id,),
+                    &payload,
+                )
+                .await?;
+            } else {
+                cl.import_guest_jwt(&registry.guest_jwt).await?;
+                cl.import_core_addr(&user_id, &registry.address).await?;
+                cl.remote_storage_update(&[user_id], "_registry:user_record", &payload, true)
+                    .await?;
+            }
+        }
         Ok(())
     }
 }
