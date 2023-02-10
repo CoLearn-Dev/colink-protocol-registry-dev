@@ -1,4 +1,5 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
+#![allow(clippy::uninlined_format_args)]
 use colink::{
     decode_jwt_without_validation, utils::get_colink_home, CoLink, Participant, ProtocolEntry,
 };
@@ -7,7 +8,7 @@ use fs4::FileExt;
 use prost::Message;
 use std::{
     fs::File,
-    io::{Read, Seek, SeekFrom, Write},
+    io::{Read, Seek, Write},
     path::Path,
 };
 
@@ -36,7 +37,7 @@ impl ProtocolEntry for Init {
             if lines.is_empty() || lines[0].is_empty() {
                 registry_addr = cl.get_core_addr()?;
                 registry_jwt = cl.generate_token("guest").await?;
-                file.seek(SeekFrom::Start(0))?;
+                file.rewind()?;
                 file.write_all(format!("{}\n{}\n", registry_addr, registry_jwt).as_bytes())?;
             } else {
                 registry_addr = lines[0].to_string();
