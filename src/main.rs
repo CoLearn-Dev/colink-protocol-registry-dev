@@ -77,10 +77,15 @@ async fn update_registries(
     let guest_jwt = cl
         .generate_token_with_expiration_time(chrono::Utc::now().timestamp() + 86400 * 31, "guest")
         .await?;
+    let forwarding_user_id = match cl.read_entry("_registry:forwarding_user_id").await {
+        Ok(forwarding_user_id) => String::from_utf8_lossy(&forwarding_user_id).to_string(),
+        Err(_) => Default::default(),
+    };
     let user_record = UserRecord {
         user_id: cl.get_user_id()?,
         core_addr: cl.get_core_addr()?,
         guest_jwt,
+        forwarding_user_id,
     };
     let mut payload = vec![];
     user_record.encode(&mut payload).unwrap();
