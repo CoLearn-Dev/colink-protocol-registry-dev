@@ -1,11 +1,11 @@
 [package]
 name = "colink-protocol-registry"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 
 [dependencies]
 chrono = "0.4"
-colink = "0.3.0"
+colink = "0.3.2"
 fs4 = { version = "0.6", features = ["sync"] }
 prost = "0.10"
 tokio = "1.24"

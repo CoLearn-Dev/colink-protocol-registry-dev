@@ -462,9 +462,9 @@ dependencies = [
 
 [[package]]
 name = "colink"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60a15b3a6c5c9cac9f28e88df8b3a6cd4549c7498e72e410e49b9939419b0da8"
+checksum = "d85971d2130bc061ca8dee5bd07568d8f3b675a1d21538e5faa7916d64c55de7"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -498,7 +498,7 @@ dependencies = [
 
 [[package]]
 name = "colink-protocol-registry"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "colink",
