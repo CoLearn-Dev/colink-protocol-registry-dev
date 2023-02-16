@@ -182,6 +182,15 @@ impl ProtocolEntry for QueryFromRegistries {
                     cl.import_guest_jwt(&user_record.guest_jwt).await?;
                     cl.import_core_addr(&user_record.user_id, &user_record.core_addr)
                         .await?;
+                    // TODO replace to import_forwarding_user_id
+                    cl.update_entry(
+                        &format!(
+                            "_internal:known_users:{}:forwarding_user_id",
+                            user_record.user_id
+                        ),
+                        user_record.forwarding_user_id.as_bytes(),
+                    )
+                    .await?;
                     return Ok(());
                 }
             }
