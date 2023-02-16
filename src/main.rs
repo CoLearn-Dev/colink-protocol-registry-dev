@@ -180,14 +180,16 @@ impl ProtocolEntry for QueryFromRegistries {
                 if data.is_ok() {
                     let user_record: UserRecord = Message::decode(&*data.unwrap())?;
                     // TODO replace to import_forwarding_user_id
-                    cl.update_entry(
-                        &format!(
-                            "_internal:known_users:{}:forwarding_user_id",
-                            user_record.user_id
-                        ),
-                        user_record.forwarding_user_id.as_bytes(),
-                    )
-                    .await?;
+                    if !user_record.forwarding_user_id.is_empty() {
+                        cl.update_entry(
+                            &format!(
+                                "_internal:known_users:{}:forwarding_user_id",
+                                user_record.user_id
+                            ),
+                            user_record.forwarding_user_id.as_bytes(),
+                        )
+                        .await?;
+                    }
                     cl.import_guest_jwt(&user_record.guest_jwt).await?;
                     cl.import_core_addr(&user_record.user_id, &user_record.core_addr)
                         .await?;
