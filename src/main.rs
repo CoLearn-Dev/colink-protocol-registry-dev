@@ -179,9 +179,6 @@ impl ProtocolEntry for QueryFromRegistries {
                 };
                 if data.is_ok() {
                     let user_record: UserRecord = Message::decode(&*data.unwrap())?;
-                    cl.import_guest_jwt(&user_record.guest_jwt).await?;
-                    cl.import_core_addr(&user_record.user_id, &user_record.core_addr)
-                        .await?;
                     // TODO replace to import_forwarding_user_id
                     cl.update_entry(
                         &format!(
@@ -191,6 +188,9 @@ impl ProtocolEntry for QueryFromRegistries {
                         user_record.forwarding_user_id.as_bytes(),
                     )
                     .await?;
+                    cl.import_guest_jwt(&user_record.guest_jwt).await?;
+                    cl.import_core_addr(&user_record.user_id, &user_record.core_addr)
+                        .await?;
                     return Ok(());
                 }
             }
